@@ -1,11 +1,6 @@
 
- !pip install flask ultralytics cloudinary opencv-python-headles
-# 2. CLOUDFLARE TUNNEL (Run this to get your URL)
-# !wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-# !chmod +x cloudflared-linux-amd64
-# !nohup ./cloudflared-linux-amd64 tunnel --url http://localhost:5000 > cloudflare.log 2>&1 &
-# !sleep 5
-# !grep -o 'https://[^ ]*\.trycloudflare\.com' cloudflare.log
+!pip install flask pyngrok ultralytics cloudinary opencv-python-headless
+!pip install --upgrade pyngrok
 
 import cloudinary
 import cloudinary.uploader
@@ -17,17 +12,30 @@ import numpy as np
 import os
 from datetime import datetime
 from ultralytics import YOLO
+from pyngrok import ngrok
+
+
 current_alarm_status = "IDLE" 
 last_violation_time = 0
+
+ngrok.set_auth_token("YOUR_NGROK_AUTH_TOKEN_HERE")
+ngrok.kill()
+public_url = ngrok.connect(5000)
+print(f"\n=====================================================")
+print(f"✅ CAMERA URL (ESP32-CAM): {public_url.public_url}/analyze")
+print(f"✅ ALARM URL  (ESP32-S3):  {public_url.public_url}/status")
+print(f"=====================================================\n")
 app = Flask(__name__)
 cloudinary.config(
-  cloud_name = "duu0e7ylg",
+  cloud_name = "YOUR_CLOUD_NAME",
   api_key = "YOUR_API_KEY",
   api_secret = "YOUR_API_SECRET",
   secure = True
 )
+
 print("Loading YOLO model...")
 model = YOLO("best.pt")
+
 def background_upload(temp_path, date_str, time_exact):
     try:
         cloudinary.uploader.upload(
@@ -37,15 +45,13 @@ def background_upload(temp_path, date_str, time_exact):
         )
         os.remove(temp_path)
     except Exception as e:
-        print(f"Cloudinary upload failed: {e}")
+        pass
 
-@app.route('/')
-def home():
-    return "Brain Server is Online via Cloudflare"
 @app.route('/status', methods=['GET'])
 def get_status():
     global current_alarm_status
     return jsonify({"status": current_alarm_status})
+
 @app.route('/analyze', methods=['POST'])
 def analyze_frame():
     global current_alarm_status, last_violation_time
@@ -60,10 +66,10 @@ def analyze_frame():
     if frame is None:
         return jsonify({"status": current_alarm_status})
 
-    
     results = model(frame, imgsz=640, conf=0.50, verbose=False)
     annotated_frame = results[0].plot()
 
+    # --- 3-STATE DETECTION LOGIC ---
     violation_seen = False
     helmet_seen = False
 
@@ -73,12 +79,12 @@ def analyze_frame():
             if "nhelmet" in name or "no-" in name:
                 violation_seen = True
             elif "helmet" in name:
-                helmet_seen = True 
+                helmet_seen = True # A safe helmet was explicitly detected!
 
     current_time = time.time()
 
     if violation_seen:
-        print(f"🚨 [{datetime.now().strftime('%H:%M:%S')}] VIOLATION DETECTED!")
+        print("🚨 AI Decision: VIOLATION DETECTED!")
         last_violation_time = current_time
         current_alarm_status = "VIOLATION"
 
@@ -90,13 +96,16 @@ def analyze_frame():
         threading.Thread(target=background_upload, args=(temp_path, date_str, time_exact)).start()
 
     else:
+        # Check if the 5-second violation cooldown has expired
         if (current_time - last_violation_time) > 5.0:
             if helmet_seen:
-                print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] SAFE")
+                print("✅ AI Decision: SAFE (Helmet Detected)")
                 current_alarm_status = "SAFE"
             else:
+                print("💤 AI Decision: IDLE (Frame Empty)")
                 current_alarm_status = "IDLE"
         else:
+            print("⏳ AI Decision: HOLDING ALARM STATE")
             current_alarm_status = "VIOLATION"
 
     return jsonify({"status": current_alarm_status})
