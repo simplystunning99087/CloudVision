@@ -1,15 +1,15 @@
 Cloud-to-Edge AI Safety System (ESP32(Microcontroller&CAM + YOLOv8)
-📌 Overview
-This project is a distributed Internet of Things (IoT) architecture designed to monitor safety compliance (e.g., helmet/seatbelt detection) in real-time. It bridges physical edge microcontrollers with a cloud-based AI inference engine using secure tunneling protocols. 
 
-Instead of running heavy AI models on weak microcontrollers, this architecture leverages a **Python Flask "Brain Server"** running YOLO object detection in the cloud, while decentralized **ESP32 Edge Nodes** handle data collection and physical alarm triggering.
+
+📌 Overview
+This project is a distributed Internet of Things (IoT) architecture designed to monitor safety compliance (e.g., helmet/seatbelt detection) in real-time. It bridges physical edge microcontrollers with a cloud-based AI inference engine using secure tunneling protocols. Instead of running heavy AI models on weak microcontrollers, this architecture leverages a **Python Flask "Brain Server"** running YOLO object detection in the cloud, while decentralized **ESP32 Edge Nodes** handle data collection and physical alarm triggering.
 
 🏗️ System Architecture
 The system is divided into three distinct functional nodes:
-
 1. The Vision Node (ESP32-CAM):Captures physical environment data and streams raw frames via `POST` requests to the cloud server.
 2. The Brain Server (Python/Flask + YOLOv8): A cloud-hosted environment (Google Colab/Kaggle Notebook) that processes incoming frames, runs AI inference to detect safety violations, uploads photographic evidence to Cloudinary, and updates a global state machine.
 3. The Control Node (ESP32-S3): A decentralized alarm node that continuously polls the Brain Server's API via `GET` requests to fetch the current system state, triggering physical hardware alarms when a violation is detected.
+
 🚀 Setup & Deployment
 1. Cloud Environment: Run the Python script in Google Colab or a local environment with a GPU. Ensure `flask`, `ultralytics`, and `cloudinary` are installed.
 2. Network Tunnel: Use Ngrok or Cloudflare to expose local port `5000` to the public web.
